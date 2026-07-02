@@ -1,0 +1,12 @@
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+sourcemap.json
+.pesde/
+.vscode/
+luau_packages/
+lune_packages/
+roblox_packages/
+test/
+pesde.lock

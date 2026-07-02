@@ -1,0 +1,19 @@
+{
+  "name": "vide",
+  "tree": {
+      "$className": "DataModel",
+      "ReplicatedStorage": {
+          "umbra": {
+            "$path": "src"
+          },
+          "roblox_packages": {
+            "$path": "roblox_packages"
+          }
+      },
+      "ServerScriptService": {
+        "test": {
+          "$path": "test"
+        }
+      }
+   }
+}
