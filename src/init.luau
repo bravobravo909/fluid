@@ -6,7 +6,7 @@ local derive = require("@self/derive")
 local edit = require("@self/edit")
 local effect = require("@self/effect")
 local action = require("@self/instances/action")
-const changed = require("@self/instances/changed")
+local changed = require("@self/instances/changed")
 local create = require("@self/instances/create")
 local hydrate = require("@self/instances/hydrate")
 local instantiate = require("@self/instances/instantiate")
@@ -16,7 +16,7 @@ local source = require("@self/source")
 local thread = require("@self/thread")
 local untrack = require("@self/untrack")
 local ensure = require("@self/instances/ensure")
-const root = require("@self/root")
+local root = require("@self/root")
 
 export type Can<T> = T | () -> T
 export type PropertiesFor<T> = types.PropertiesFor<T>
