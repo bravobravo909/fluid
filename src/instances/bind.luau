@@ -56,7 +56,7 @@ local function getProperty(inst: Instance, property: string): any
 end
 
 local function bindProperty<T>(inst: Instance, property: string, value: () -> T)
-	local propertyNode = graph.createNode(graph.getScope(), nil, function()
+	local propertyNode = graph.createNode(graph.assertStableScope(), nil, function()
 		setProperty(inst, property, value())
 		return nil
 	end)
@@ -68,7 +68,7 @@ local function bindEvent(inst: Instance, eventName: string, func: <T...>(T...) -
 	local event = (inst :: any)[eventName] :: RBXScriptSignal
 	local connection = event:Connect(func :: any)
 
-	graph.pushCleanup(graph.assertScope(), function()
+	graph.pushCleanup(graph.assertStableScope(), function()
 		connection:Disconnect()
 	end)
 end
@@ -112,11 +112,12 @@ local function reactiveChildEffect(
 			local children: { new: { [Instance]: true }, current: { [Instance]: true } } =
 				{ new = {}, current = {} }
 
-			graph.createNode(graph.getScope(), children, function(value)
+			local scope = graph.assertStableScope()
+			graph.createNode(scope, children, function(value)
 				return reactiveChildEffect(inst, child, value)
 			end)
 
-			graph.pushCleanup(graph.getScope(), function()
+			graph.pushCleanup(scope, function()
 				for child in children.current do
 					child.Parent = nil
 				end
@@ -146,7 +147,7 @@ end
 
 local function bindReactiveChild(inst: Instance, func: () -> Result)
 
-	local node = graph.getScope()
+	local node = graph.assertStableScope()
 
 	local children: { new: { [Instance]: true }, current: { [Instance]: true } } =
 		{ new = {}, current = {} }

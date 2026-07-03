@@ -1,6 +1,6 @@
 const graph = require("./graph")
 local refs = {}
-local function scope<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...) 
+local function root<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...) 
     local node = graph.createNode(nil, nil, nil, true)
     refs[node] = true
     local function destroy()
@@ -14,4 +14,4 @@ local function scope<T...>(fn: (destroy: () -> ()) -> T...): (() -> (), T...)
     return destroy, unpack(data)
 end
 
-return scope
+return root

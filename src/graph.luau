@@ -11,8 +11,7 @@ export type Node<T> = {
 	effect: (() -> T) | false,
 	cleanups: { () -> () } | false,
 
-	static: boolean,
-	async: boolean
+	static: boolean
 }
 
 local scopes: { [thread]: {[number]: Node<unknown>, n: number} } = {}
@@ -175,7 +174,7 @@ local function registerDependency(dependency: Node<unknown>, subscriber: Node<un
 		dependency.subs = { subscriber }
 	end
 end
-local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: (() -> ())?, static: boolean?, async: boolean?)
+local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: (() -> ())?, static: boolean?)
 	local node: Node<T> = {
 		value = value,
 		owner = if currentScope ~= nil then currentScope else false,
@@ -186,8 +185,6 @@ local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: (()
 
 		subs = {},
 		deps = {},
-
-		async = if async ~= nil then async else false 
 	} :: Node<T>
 	if currentScope then
 		if currentScope.owned then
@@ -198,6 +195,19 @@ local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: (()
 	end
 
 	return node
+end
+
+local function assertStableScope(): Node<unknown>
+    local scope = getScope()
+
+    if not scope then
+        local caller_name = debug.info(2, "n")
+        return error(`cannot use {caller_name}() outside a stable or reactive scope`, 0)
+    elseif scope.effect then
+        error("cannot create a new reactive scope inside another reactive scope", 0)
+    end
+
+    return scope
 end
 
 local function evaluateNode(node: Node<unknown>)
@@ -297,5 +307,6 @@ return {
 	flushQueue = flushQueue,
 	destroyOwned = destroyOwned,
 	flushCleanups = flushCleanups,
-	unsubscribe = unsubscribe
+	unsubscribe = unsubscribe,
+	assertStableScope = assertStableScope
 }
