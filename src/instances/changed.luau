@@ -1,9 +1,9 @@
 const cleanup = require("../cleanup")
-const action = require("./action")()
+const action = require("./action")
 
 
 local function changed<T>(property: string, callback: (T) -> ())
-    return action(function(instance)
+    return action.create(function(instance)
         local con = instance:GetPropertyChangedSignal(property):Connect(function()
             callback((instance :: any)[property])
         end)
