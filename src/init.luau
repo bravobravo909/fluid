@@ -21,6 +21,7 @@ local root = require("@self/root")
 export type Can<T> = T | () -> T
 export type PropertiesFor<T> = types.PropertiesFor<T>
 export type Source<T> = source.Source<T>
+export type Read<T> = types.Read<T>
 return {
     effect = effect,
     source = source,

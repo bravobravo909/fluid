@@ -80,21 +80,17 @@ export type Instances = {
 	Wire: Wire,
 	UIShadow: UIShadow
 }
-export type function resolve(t)
+export type function Read(t: type): type
     if t:is("union") then
-        local nonFunctions = {}
         for _, component in t:components() do
             if not component:is("function") then
-                table.insert(nonFunctions, component)
+				error(component.tag)
+                return component
             end
         end
-        if #nonFunctions == 1 then
-            return nonFunctions[1]
-        elseif #nonFunctions > 1 then
-            return types.unionof(table.unpack(nonFunctions))
-        end
     end
-    return t
+    
+    return if t:is("function") then (t:returns().head :: { type })[1] else t
 end
 
 type UnknownConnectCallback = (...any) -> ()
