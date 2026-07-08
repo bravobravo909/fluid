@@ -203,7 +203,7 @@ local function assertStableScope(): Node<unknown>
     if not scope then
         local caller_name = debug.info(2, "n")
         return error(`cannot use {caller_name}() outside a stable or reactive scope`, 0)
-    elseif scope.effect then
+    elseif not scope.static then
         error("cannot create a new reactive scope inside another reactive scope", 0)
     end
 
