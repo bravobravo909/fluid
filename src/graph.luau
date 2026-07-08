@@ -8,7 +8,7 @@ export type Node<T> = {
 	owner: Node<T> | false,
 	owned: { Node<T> } | false,
 	value: T,
-	effect: (() -> T) | false,
+	effect: ((T) -> T) | false,
 	cleanups: { () -> () } | false,
 
 	static: boolean
@@ -174,7 +174,7 @@ local function registerDependency(dependency: Node<unknown>, subscriber: Node<un
 		dependency.subs = { subscriber }
 	end
 end
-local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: (() -> ())?, static: boolean?)
+local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: ((T) -> (T))?, static: boolean?)
 	local node: Node<T> = {
 		value = value,
 		owner = if currentScope ~= nil then currentScope else false,
@@ -213,6 +213,7 @@ end
 local function evaluateNode(node: Node<unknown>)
 	if node.effect then
 		local oldValue = node.value
+
 		flushCleanups(node)
 		destroyOwned(node)
 
@@ -220,13 +221,13 @@ local function evaluateNode(node: Node<unknown>)
 		pushScope(node)
 		local ok, result
 		if store.strict then
-			ok, result = ycall(node.effect, nil)
+			ok, result = ycall(node.effect, oldValue)
 			popScope()
 			if not ok then
 				error(`effect error stacktrace\n{result}`, 0)
 			end
 		else
-			result = node.effect()
+			result = node.effect(oldValue)
 			popScope()
 			ok = true
 		end
