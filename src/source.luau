@@ -1,37 +1,31 @@
---!strict
-const graph = require("./graph")
-const store = require("./store")
-local function notify(v)
-    if typeof(v) == "table" and table.isfrozen(v) and store.strict then
-        warn("Use snapshot() for frozen tables")
-    end
-end
+local graph = require("./graph")
+type Node<T> = graph.Node<T>
+local create_source_node = graph.create_source_node
+local push_scope_as_child_of = graph.push_scope_as_child_of
+local update_descendants = graph.update_descendants
+
 export type Source<T> = (() -> T) & ((value: T) -> T)
 
-local function source<T>(initial: T): Source<T>
-    notify(initial)
-    local node = graph.createNode(nil , initial)
-    return function(...): T
-        if select("#", ...) == 0 then
-            local scope = graph.getScope()
-            if scope then
-                graph.registerDependency(node, scope)
-            end
-            return node.value
-        end
+local function source<T>(initial_value: T): Source<T>
+	local node = create_source_node(initial_value)
 
-        local v = ... :: T
-        notify(v)
-        if typeof(node.value) ~= "table" or table.isfrozen(node.value) then
-            if node.value == v then
-                return v
-            end
-        end
-        node.value = v
-        graph.notifySubs(node)
-        return v
-    end
+	local function update_source(...): T
+		if select("#", ...) == 0 then -- no args were given
+			push_scope_as_child_of(node)
+			return node.cache
+		end
+
+		local v = ... :: T
+		if node.cache == v and (type(v) ~= "table" or table.isfrozen(v)) then
+			return v
+		end
+
+		node.cache = v
+		update_descendants(node)
+		return v
+	end
+
+	return update_source
 end
-
 
 return source :: (<T>(initial_value: T) -> Source<T>) & (<T>() -> Source<T>)

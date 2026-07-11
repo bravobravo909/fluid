@@ -78,19 +78,19 @@ export type Instances = {
 	WireframeHandleAdornment: WireframeHandleAdornment,
 	WorldModel: WorldModel,
 	Wire: Wire,
-	UIShadow: UIShadow
+	UIShadow: UIShadow,
 }
 export type function Read(t: type): type
-    if t:is("union") then
-        for _, component in t:components() do
-            if not component:is("function") then
+	if t:is("union") then
+		for _, component in t:components() do
+			if not component:is("function") then
 				error(component.tag)
-                return component
-            end
-        end
-    end
-    
-    return if t:is("function") then (t:returns().head :: { type })[1] else t
+				return component
+			end
+		end
+	end
+
+	return if t:is("function") then (t:returns().head :: { type })[1] else t
 end
 
 type UnknownConnectCallback = (...any) -> ()
@@ -144,17 +144,15 @@ end
 
 type instance = Instance
 
-type Action = action.Identity
+type Action = action.Action
 
 export type function GetInstance(className: type): type
-	
 	if className.tag == "extern" then
 		return className
 	end
 
 	return Instances:readproperty(className)
 end
-
 
 -- temp arg for action, because for some reason its not added as a global automatically
 export type function PropertiesFor(class: type): type
@@ -177,7 +175,6 @@ export type function PropertiesFor(class: type): type
 	})
 
 	while current do
-		
 		for property, value in current:properties() do
 			if table.find(readOnlyProperties, property) then
 				continue
@@ -196,10 +193,7 @@ export type function PropertiesFor(class: type): type
 				properties:setproperty(
 					property :: any,
 					types.optional(
-						types.unionof(
-							types.newfunction(emptyTable :: any, argsTable :: any),
-							value.write :: any
-						)
+						types.unionof(types.newfunction(emptyTable :: any, argsTable :: any), value.write :: any)
 					)
 				)
 			end
@@ -210,8 +204,7 @@ export type function PropertiesFor(class: type): type
 
 	local nestedTableOrFunctionOrChild = types.newtable()
 	local functionReturnsChild = types.newfunction()
-	local union =
-		types.unionof(nestedTableOrFunctionOrChild, functionReturnsChild, instance, Action)
+	local union = types.unionof(nestedTableOrFunctionOrChild, functionReturnsChild, instance, Action)
 
 	nestedTableOrFunctionOrChild:setindexer(types.number, union)
 	functionReturnsChild:setreturns({ union })
@@ -220,6 +213,5 @@ export type function PropertiesFor(class: type): type
 
 	return properties
 end
-
 
 return {}

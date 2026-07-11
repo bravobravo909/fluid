@@ -1,44 +1,11 @@
-local spring = require("@self/anim/spring")
-local tween = require("@self/anim/tween")
-local batch = require("@self/batch")
-local cleanup = require("@self/cleanup")
-local derive = require("@self/derive")
-local edit = require("@self/edit")
-local effect = require("@self/effect")
-local action = require("@self/instances/action")
-local changed = require("@self/instances/changed")
-local create = require("@self/instances/create")
-local hydrate = require("@self/instances/hydrate")
-local instantiate = require("@self/instances/instantiate")
-local types = require("@self/instances/types")
-local read = require("@self/read")
-local source = require("@self/source")
-local thread = require("@self/thread")
-local untrack = require("@self/untrack")
-local ensure = require("@self/instances/ensure")
-local root = require("@self/root")
+assert(game, "when using vide outside of Roblox, require lib.luau instead")
 
+local vide = require(script.lib)
+
+export type Source<T> = vide.Source<T>
+export type Read<T> = vide.Read<T>
 export type Can<T> = T | () -> T
-export type PropertiesFor<T> = types.PropertiesFor<T>
-export type Source<T> = source.Source<T>
-export type Read<T> = types.Read<T>
-return {
-    effect = effect,
-    source = source,
-    cleanup = cleanup,
-    hydrate = hydrate,
-    create = create,
-    untrack = untrack,
-    action = action.create,
-    batch = batch,
-    thread = thread,
-    spring = spring,
-    tween = tween,
-    read = read,
-    derive = derive,
-    instantiate = instantiate,
-    ensure = ensure,
-    edit = edit,
-    root = root,
-    changed = changed
-}
+export type PropertiesFor<T> = vide.PropertiesFor<T>
+export type Instances = vide.Instances
+
+return vide

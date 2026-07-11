@@ -1,23 +1,26 @@
---!strict
-const store = require("./store")
---// bravobravo909, concept stolen from vide and a few helpers
-export type Node<T> = {
-	subs: { Node<T> },
-	deps: { Node<T> },
+local flags = require("./flags")
 
-	owner: Node<T> | false,
-	owned: { Node<T> } | false,
-	value: T,
+export type SourceNode<T> = {
+	cache: T,
+	[number]: Node<T>,
+}
+
+export type Node<T> = {
+	cache: T,
 	effect: ((T) -> T) | false,
 	cleanups: { () -> () } | false,
 
-	static: boolean
+	context: { [number]: unknown } | false,
+
+	owned: { Node<T> } | false,
+	owner: Node<T> | false,
+
+	parents: { SourceNode<T> },
+	[number]: Node<T>, -- children
 }
 
-local scopes: { [thread]: {[number]: Node<unknown>, n: number} } = {}
-local updateQueue = { n = 0 } :: { n: number, [number]: Node<any> }
+local scopes = {} :: { [thread]: { [number]: Node<any>, n: number } } -- scopes stack
 
---// thx vide
 local function efn(err: string)
 	local trace = debug.traceback(err, 2)
 
@@ -30,7 +33,8 @@ local function efn(err: string)
 	trace ..= "\nsource update stacktrace:"
 	return trace
 end
-local function ycall<T, U>(fn: ((T) -> U) | (() -> U), arg: T): (boolean, string | U)
+
+local function ycall<T, U>(fn: (T) -> U, arg: T): (boolean, string | U)
 	local thread = coroutine.create(xpcall)
 	--local function efn(err: string) return debug.traceback(err, 3) end
 	local resume_ok, run_ok, result = coroutine.resume(thread, fn, efn, arg)
@@ -44,41 +48,58 @@ local function ycall<T, U>(fn: ((T) -> U) | (() -> U), arg: T): (boolean, string
 	return run_ok, result
 end
 
-local function pushScope<T>(scope: Node<T>)
-	if not scopes[coroutine.running()] then
-		scopes[coroutine.running()] = { n = 0}
+local function get_scope(): Node<unknown>?
+	local found_scope = scopes[coroutine.running()]
+	if found_scope then
+		return found_scope[found_scope.n]
 	end
-	local thisScopes = scopes[coroutine.running()]
-	table.insert(thisScopes, scope)
-	thisScopes.n += 1
+	return nil
 end
 
-local function popScope()
-	local thisScopes = scopes[coroutine.running()]
-	if not thisScopes then return end
-	table.remove(thisScopes)
-	thisScopes.n -= 1
+local function assert_stable_scope(): Node<unknown>
+	local scope = get_scope()
 
-	if not scopes[coroutine.running()] then
-		scopes[coroutine.running()] = nil
+	if not scope then
+		local caller_name = debug.info(2, "n")
+		return error(`cannot use {caller_name}() outside a stable or reactive scope`, 0)
+	elseif scope.effect then
+		error("cannot create a new reactive scope inside another reactive scope", 0)
 	end
-end
 
-local function getScope(): Node<unknown>?
-	local scopes = scopes[coroutine.running()]
-	if not scopes then
-		return nil
-	end
-	return scopes[scopes.n]
-end
-local function assertScope()
-	local scope = getScope()
-	assert(scope, "Can only be performed in a scope")
 	return scope
 end
 
+local function push_child<T>(parent: SourceNode<any>, child: Node<any>)
+	table.insert(parent, child)
+	table.insert(child.parents, parent)
+end
 
-local function pushCleanup<T>(node: Node<T>, cleanup: () -> ())
+local function push_scope<T>(node: Node<T>)
+	local found_scope = scopes[coroutine.running()]
+	if not found_scope then
+		found_scope = { n = 0 }
+		scopes[coroutine.running()] = found_scope
+	end
+	local n = found_scope.n + 1
+	found_scope.n = n
+	found_scope[n] = node
+end
+
+local function pop_scope()
+	local found_scope = scopes[coroutine.running()]
+	if found_scope then
+		local n = found_scope.n
+		found_scope.n = n - 1
+		found_scope[n] = nil
+		if found_scope.n == 0 then
+			scopes[coroutine.running()] = nil
+		end
+	else
+		error("what da helly")
+	end
+end
+
+local function push_cleanup<T>(node: Node<T>, cleanup: () -> ())
 	if node.cleanups then
 		table.insert(node.cleanups, cleanup)
 	else
@@ -86,10 +107,10 @@ local function pushCleanup<T>(node: Node<T>, cleanup: () -> ())
 	end
 end
 
-local function flushCleanups<T>(node: Node<T>)
+local function flush_cleanups<T>(node: Node<T>)
 	if node.cleanups then
 		for _, fn in node.cleanups do
-			local ok, err = pcall(fn)
+			local ok, err: string? = xpcall(fn, debug.traceback)
 			if not ok then
 				error(`cleanup error: {err}`, 0)
 			end
@@ -99,44 +120,33 @@ local function flushCleanups<T>(node: Node<T>)
 	end
 end
 
-local function findSwapPop<T>(t: { T }, v: T)
+local function find_and_swap_pop<T>(t: { T }, v: T)
 	local i = table.find(t, v) :: number
 	local n = #t
 	t[i] = t[n]
 	t[n] = nil
 end
 
-local function unsubscribe<T>(node: Node<T>)
-	local deps = node.deps
-	if deps then
-		for _, dep in deps do
-			if dep.subs then
-				findSwapPop(dep.subs, node)
-			end
-		end
-		table.clear(deps)
+local function unparent<T>(node: Node<T>)
+	local parents = node.parents
+
+	for i, parent in parents do
+		find_and_swap_pop(parent, node)
+		parents[i] = nil
 	end
 end
 
 local function destroy<T>(node: Node<T>)
-	if store.strict then
-		for _, allScopes in scopes do
-			if table.find(allScopes, node) then
-				error("attempt to destroy an active scope", 0)
-			end
-		end
+	if flags.strict and table.find(scopes[coroutine.running()], node) then
+		error("attempt to destroy an active scope", 0)
 	end
 
-
-	flushCleanups(node)
-	unsubscribe(node)
+	flush_cleanups(node)
+	unparent(node)
 
 	if node.owner then
-		local owned = node.owner.owned
-		if owned then
-			table.remove(owned, table.find(owned, node))
-			node.owner = false
-		end
+		find_and_swap_pop(node.owner.owned :: { Node<T> }, node)
+		node.owner = false
 	end
 
 	if node.owned then
@@ -146,7 +156,8 @@ local function destroy<T>(node: Node<T>)
 		end
 	end
 end
-local function destroyOwned<T>(node: Node<T>)
+
+local function destroy_owned<T>(node: Node<T>)
 	if node.owned then
 		local owned = node.owned
 		while owned[1] do
@@ -155,159 +166,180 @@ local function destroyOwned<T>(node: Node<T>)
 	end
 end
 
+local update_queue = { n = 0 } :: { n: number, [number]: Node<any> }
 
+local function evaluate_node<T>(node: Node<T>)
+	if flags.strict then
+		if table.find(scopes[coroutine.running()], node) then
+			error("a scope, that should rerun due to the update of a source, is already active", 0)
+		end
 
-local function registerDependency(dependency: Node<unknown>, subscriber: Node<unknown>)
-	if not subscriber.effect or subscriber.static then
-		return
-	end
+		local initial_value = node.cache
 
-	if table.find(subscriber.deps, dependency) then
-		return
-	end
+		for i = 1, 2 do
+			local cur_value = node.cache
 
-	table.insert(subscriber.deps, dependency)
+			flush_cleanups(node)
+			destroy_owned(node)
 
-	if dependency.subs then
-		table.insert(dependency.subs, subscriber)
+			push_scope(node)
+			local ok, new_value = ycall(node.effect :: (T) -> T, cur_value)
+			pop_scope()
+
+			if not ok then
+				table.clear(update_queue)
+				update_queue.n = 0
+				error(`effect error stacktrace\n{new_value :: string}`, 0)
+			end
+
+			node.cache = new_value :: T
+		end
+
+		return initial_value ~= node.cache
 	else
-		dependency.subs = { subscriber }
+		local cur_value = node.cache
+
+		flush_cleanups(node)
+		destroy_owned(node)
+
+		push_scope(node)
+		local ok, new_value = pcall(node.effect :: (T) -> T, node.cache)
+		pop_scope()
+
+		if not ok then
+			table.clear(update_queue)
+			update_queue.n = 0
+			error(`effect error:\n{new_value}\n`, 0)
+		end
+
+		node.cache = new_value
+		return cur_value ~= new_value
 	end
 end
-local function createNode<T>(currentScope: Node<unknown>?, value: T, effect: ((T) -> (T))?, static: boolean?)
-	local node: Node<T> = {
-		value = value,
-		owner = if currentScope ~= nil then currentScope else false,
-		effect = if effect ~= nil then effect else false,
-		cleanups = false,
-		owned = false,
-		static = if static ~= nil then static else false,
 
-		subs = {},
-		deps = {},
-	} :: Node<T>
-	if currentScope then
-		if currentScope.owned then
-			table.insert(currentScope.owned, node)
+local function queue_children_for_update<T>(node: SourceNode<T>)
+	local i = update_queue.n
+	while node[1] do
+		i += 1
+		update_queue[i] = node[1]
+		unparent(node[1])
+	end
+	update_queue.n = i
+end
+
+local function get_update_queue_length()
+	return update_queue.n
+end
+
+local function flush_update_queue(from: number)
+	local i = from + 1
+	while i <= update_queue.n do
+		local node = update_queue[i]
+		--assert(node.effect)
+
+		if node.owner and evaluate_node(node) then
+			queue_children_for_update(node)
+		end
+
+		update_queue[i] = false :: any
+		i += 1
+	end
+
+	update_queue.n = from
+end
+
+local function update_descendants<T>(root: SourceNode<T>)
+	local n0 = update_queue.n
+	queue_children_for_update(root)
+
+	if flags.batch then
+		return
+	end
+
+	local i = n0 + 1
+	while i <= update_queue.n do
+		local node = update_queue[i]
+		--assert(node.effect)
+
+		-- check if node is still owned in case destroyed after queued
+		if node.owner and evaluate_node(node) then
+			queue_children_for_update(node)
+		end
+
+		update_queue[i] = false :: any -- false instead of nil to avoid sparse
+		i += 1
+	end
+
+	update_queue.n = n0
+end
+
+local function push_scope_as_child_of<T>(node: SourceNode<T>)
+	local scope = get_scope()
+	if scope and scope.effect then -- do not track nodes with no effect
+		push_child(node, scope)
+	end
+end
+
+local function create_node<T>(owner: false | Node<any>, effect: false | (T) -> T, value: T): Node<T>
+	local node: Node<T> = {
+		cache = value,
+		effect = effect,
+		cleanups = false,
+
+		context = false,
+
+		owner = owner,
+		owned = false,
+
+		parents = {},
+	}
+
+	if owner then
+		if owner.owned then
+			table.insert(owner.owned, node)
 		else
-			currentScope.owned = { node }
+			owner.owned = { node }
 		end
 	end
 
 	return node
 end
 
-local function assertStableScope(): Node<unknown>
-    local scope = getScope()
-
-    if not scope then
-        local caller_name = debug.info(2, "n")
-        return error(`cannot use {caller_name}() outside a stable or reactive scope`, 0)
-    elseif not scope.static then
-        error("cannot create a new reactive scope inside another reactive scope", 0)
-    end
-
-    return scope
+local function create_source_node<T>(value: T): SourceNode<T>
+	return { cache = value }
 end
 
-local function evaluateNode(node: Node<unknown>)
-	if node.effect then
-		local oldValue = node.value
+local function get_children<T>(node: Node<T>): { Node<unknown> }
+	return { unpack(node) } :: { Node<any> }
+end
 
-		flushCleanups(node)
-		destroyOwned(node)
-
-
-		pushScope(node)
-		local ok, result
-		if store.strict then
-			ok, result = ycall(node.effect, oldValue)
-			popScope()
-			if not ok then
-				error(`effect error stacktrace\n{result}`, 0)
-			end
-		else
-			result = node.effect(oldValue)
-			popScope()
-			ok = true
-		end
-
-		if not ok then
-			error(result, 0)
-		end
-
-		if node.static then
-			node.effect = false
-		end
-
-
-		node.value = result
-		return oldValue ~= result
+local function set_context<T>(node: Node<T>, key: number, value: unknown)
+	if node.context then
+		node.context[key] = value
+	else
+		node.context = { [key] = value }
 	end
-	return false
 end
 
-
-
-local function queueSubs<T>(node: Node<T>)
-    local i = updateQueue.n
-    while node.subs[1] do
-        i += 1
-        updateQueue[i] = node.subs[1]
-        unsubscribe(node.subs[1])
-    end
-    updateQueue.n = i
-end
-
-local function getUpdateQueueLength()
-    return updateQueue.n
-end
-
-local function flushQueue(from: number)
-    local i = from + 1
-    while i <= updateQueue.n do
-        local node = updateQueue[i]
-        if node.owner and evaluateNode(node) then
-            queueSubs(node)
-        end
-        updateQueue[i] = false :: any
-        i += 1
-    end
-    updateQueue.n = from
-end
-
-local function notifySubs(root: Node<unknown>)
-    local n0 = updateQueue.n
-	queueSubs(root)
-	if store.batching then return end
-
-    local i = n0 + 1
-    while i <= updateQueue.n do
-        local node = updateQueue[i]
-        if node.owner and evaluateNode(node) then
-            queueSubs(node)
-        end
-        updateQueue[i] = false :: any
-        i += 1
-    end
-
-    updateQueue.n = n0
-end
-return {
-	notifySubs = notifySubs,
-	evaluateNode = evaluateNode,
-	createNode = createNode,
-	registerDependency = registerDependency,
-	pushCleanup = pushCleanup,
-	getScope = getScope,
-	pushScope = pushScope,
-	popScope = popScope,
-	assertScope = assertScope,
+return table.freeze({
+	push_scope = push_scope,
+	pop_scope = pop_scope,
+	evaluate_node = evaluate_node,
+	get_scope = get_scope,
+	assert_stable_scope = assert_stable_scope,
+	push_cleanup = push_cleanup,
 	destroy = destroy,
-	getUpdateQueueLength = getUpdateQueueLength,
-	flushQueue = flushQueue,
-	destroyOwned = destroyOwned,
-	flushCleanups = flushCleanups,
-	unsubscribe = unsubscribe,
-	assertStableScope = assertStableScope
-}
+	flush_cleanups = flush_cleanups,
+	push_scope_as_child_of = push_scope_as_child_of,
+	update_descendants = update_descendants,
+	push_child = push_child,
+	create_node = create_node,
+	create_source_node = create_source_node,
+	get_children = get_children,
+	flush_update_queue = flush_update_queue,
+	get_update_queue_length = get_update_queue_length,
+	set_context = set_context,
+	scopes = scopes,
+
+	q = update_queue,
+})

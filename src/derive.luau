@@ -1,18 +1,18 @@
-const graph = require("./graph")
+local graph = require "./graph"
+local create_node = graph.create_node
+local push_scope_as_child_of = graph.push_scope_as_child_of
+local assert_stable_scope = graph.assert_stable_scope
+local evaluate_node = graph.evaluate_node
 
 local function derive<T>(source: () -> T): () -> T
-    local node = graph.createNode(graph.assertScope(), nil, source)
-    graph.evaluateNode(node)
+    local node = create_node(assert_stable_scope(), source, false :: any)
+
+    evaluate_node(node)
 
     return function()
-        local scope = graph.getScope()
-        if scope then
-            graph.registerDependency(node, scope)
-        end
-
-        return node.value
+        push_scope_as_child_of(node)
+        return node.cache
     end
 end
 
 return derive
- 
