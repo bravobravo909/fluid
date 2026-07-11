@@ -1,3 +1,4 @@
+--!strict
 const types = require("./types")
 
 local function read<T>(src: T | () -> T): types.Read<T>
@@ -7,4 +8,5 @@ local function read<T>(src: T | () -> T): types.Read<T>
 		return src :: T
 	end
 end
+
 return read
