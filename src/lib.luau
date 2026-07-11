@@ -22,6 +22,7 @@ local changed = require("./changed")
 local edit = require("./edit")
 local _timeout, update_timeouts = require("./timeout")()
 local flags = require("./flags")
+local thread = require("./thread")
 local tween = require("./tween")
 local types = require("./types")
 
@@ -75,6 +76,7 @@ local vide = {
 	read = read,
 	batch = batch,
 	edit = edit,
+	thread = thread,
 
 	-- animations
 	spring = spring,
