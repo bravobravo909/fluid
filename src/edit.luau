@@ -1,4 +1,4 @@
-local store = require("./store")
+local flags = require("./flags")
 local untrack = require("./untrack")
 local function deepFreeze(t: { [any]: any })
 	table.freeze(t)
@@ -18,7 +18,7 @@ local function edit<T>(src: () -> T, received: (T) -> T): T
 	if typeof(newValue) ~= "table" then
 		return
 	end
-	if store.strict then
+	if flags.strict then
 		deepFreeze(newValue)
 	end
 	src(newValue)
