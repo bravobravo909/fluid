@@ -91,8 +91,8 @@ local vide = {
 	defer_nested_properties = (nil :: any) :: boolean,
 
 	-- temporary
-	apply = function(instance: Instance)
-		return function(props: { [any]: any })
+	apply = function<T>(instance: T & Instance)
+		return function(props: types.PropertiesFor<T>)
 			apply(instance, props)
 			return instance
 		end

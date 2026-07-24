@@ -4,7 +4,6 @@ local flags = require("./flags")
 local implicit_effect = require("./implicit_effect")
 local _, is_action = require("./action")()
 local graph = require("./graph")
-local types = require("./types")
 type Node<T> = graph.Node<T>
 
 type Array<V> = { V }
@@ -115,7 +114,7 @@ local function process_properties(properties: Map<unknown, unknown>, instance: I
 end
 
 -- applies table of nested properties to an instance using full vide semantics
-local function apply<T>(instance: T & Instance, properties: types.PropertiesFor<T>): T
+local function apply<T>(instance: T & Instance, properties: { [unknown]: unknown }): T
 	if not properties then
 		error("attempt to call a constructor returned by create() with no properties")
 	end
