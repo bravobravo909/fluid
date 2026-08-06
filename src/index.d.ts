@@ -359,7 +359,7 @@ declare namespace Vide {
 	 * @param callback effect callback, set is passed in as an argument
 	 * to mutate the source's value
 	 */
-	function thread<T>(callback: (set: (newValue: T) => void) => void): void
+	function thread<T>(callback: (set: (newValue: T) => void) => void): () => T | null
 
 	/**
 	 * Reads the source and returns its value. Non-source values are returned
