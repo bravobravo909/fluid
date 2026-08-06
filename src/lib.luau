@@ -106,6 +106,9 @@ local vide = {
 		end
 		step(dt)
 	end,
+
+	-- ts
+	match = switch,
 }
 
 setmetatable(vide :: any, {

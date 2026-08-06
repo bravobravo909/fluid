@@ -1,0 +1,30 @@
+{
+	"name": "@rbxts/vide",
+	"version": "0.4.0",
+	"description": "A reactive Luau library for creating UI.",
+	"repository": "bravobravo909/vide",
+	"license": "MIT",
+	"author": "bravobravo909",
+	"typings": "src/index.d.ts",
+	"main": "src/init.luau",
+	"files": [
+		"src"
+	],
+	"dependencies": {
+		"@rbxts/ripple": "^0.10.2",
+		"roblox-ts": "^3.0.0"
+	},
+	"devDependencies": {
+		"@rbxts/compiler-types": "^3.0.0-types.0",
+		"@rbxts/types": "^1.0.915",
+		"@typescript-eslint/eslint-plugin": "^8.58.1",
+		"@typescript-eslint/parser": "^8.58.1",
+		"eslint": "^10.2.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-prettier": "^5.5.5",
+		"eslint-plugin-roblox-ts": "^1.4.0",
+		"prettier": "^3.8.2",
+		"roblox-ts": "^3.0.0",
+		"typescript": "^5.9.3"
+	}
+}

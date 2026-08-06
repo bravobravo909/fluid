@@ -10,3 +10,5 @@ lune_packages/
 roblox_packages/
 test/
 pesde.lock
+
+node_modules/

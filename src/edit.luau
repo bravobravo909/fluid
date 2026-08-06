@@ -8,7 +8,7 @@ local function deepFreeze(t: { [any]: any })
 		end
 	end
 end
-local function edit<T>(src: () -> T, received: (T) -> T): T
+local function edit<T>(src: () -> T, received: (T) -> T)
 	local value = untrack(src)
 	if typeof(value) ~= "table" then
 		return
