@@ -3,13 +3,13 @@ local cleanup = require("./cleanup")
 local effect = require("./effect")
 local source = require("./source")
 
-local function spring<T>(src: () -> T, springOptions: ripple.SpringOptions)
+local function spring<T>(src: () -> T, springOptions: ripple.SpringOptions<T>): (source.Source<T>, ripple.Spring<T>)
 	local spr = ripple.createSpring(springOptions.position or src(), springOptions)
 	local newValue = source(spr:getPosition())
 	if not (springOptions and springOptions.start == false) then
 		spr:start()
 	end
-	local disconnect = spr:onChange(newValue)
+	local disconnect = spr:onChange(newValue :: any)
 
 	cleanup(function()
 		disconnect()

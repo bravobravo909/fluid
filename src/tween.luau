@@ -3,13 +3,13 @@ local cleanup = require("./cleanup")
 local effect = require("./effect")
 local source = require("./source")
 
-local function tween<T>(src: () -> T, tweenOptions: ripple.TweenOptions)
+local function tween<T>(src: () -> T, tweenOptions: ripple.TweenOptions<T>): (source.Source<T>, ripple.Tween<T>)
 	local tween = ripple.createTween(tweenOptions.position or src(), tweenOptions)
 	local newValue = source(tween:getPosition())
 	if not (tweenOptions and tweenOptions.start == false) then
 		tween:start()
 	end
-	local disconnect = tween:onChange(newValue)
+	local disconnect = tween:onChange(newValue :: any)
 
 	cleanup(function()
 		disconnect()
