@@ -42,15 +42,42 @@ export type function CastIntoValue(value: type)
 end
 
 export type function Read(t: type): type
-	if t:is("union") then
-		for _, component in t:components() do
-			if not component:is("function") then
-				return component
-			end
-		end
+	if t:is("function") then
+		return (t:returns().head :: { type })[1]
 	end
 
-	return if t:is("function") then (t:returns().head :: { type })[1] else t
+	if t:is("union") then
+		local parts = {}
+		local function add(part: type)
+			if part:is("union") then
+				for _, member in part:components() do
+					add(member)
+				end
+				return
+			end
+			for _, existing in parts do
+				if existing == part then
+					return
+				end
+			end
+			table.insert(parts, part)
+		end
+
+		for _, component in t:components() do
+			if component:is("function") then
+				local head = component:returns().head
+				if head and head[1] then
+					add(head[1])
+				end
+			else
+				add(component)
+			end
+		end
+
+		return if #parts == 1 then parts[1] else types.unionof(unpack(parts))
+	end
+
+	return t
 end
 
 local function read<T>(src: T | () -> T): Read<T>
