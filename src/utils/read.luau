@@ -41,8 +41,24 @@ export type function CastIntoValue(value: type)
 	end
 end
 
-local function read<T>(value: T): CastIntoValue<T>
-	return if type(value) == "function" then (value :: () -> T)() else value
+export type function Read(t: type): type
+	if t:is("union") then
+		for _, component in t:components() do
+			if not component:is("function") then
+				return component
+			end
+		end
+	end
+
+	return if t:is("function") then (t:returns().head :: { type })[1] else t
+end
+
+local function read<T>(src: T | () -> T): Read<T>
+	if typeof(src) == "function" then
+		return (src :: () -> T)()
+	else
+		return src :: T
+	end
 end
 
 return read
