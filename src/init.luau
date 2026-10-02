@@ -26,7 +26,7 @@ local tween = require("@self/anim/tween")
 local types = require("@self/reactive/types")
 local untrack = require("@self/reactive/untrack")
 
-export type UsedAs<T> = types.UsedAs<T>
+export type Can<T> = types.UsedAs<T>
 export type Source<T> = types.Source<T>
 export type Action = action.Identity
 export type PropertiesFor<T> = create.PropertiesFor<T>
@@ -65,7 +65,7 @@ fluid.changed = changed
 
 -- actions
 fluid.action = action.create
-fluid.is_action = action.is_action
+fluid.isAction = action.is_action
 
 -- Reactive graph
 fluid.cleanup = cleanup
@@ -77,21 +77,21 @@ fluid.root = root
 fluid.source = source
 fluid.untrack = untrack
 fluid.interval = interval
-fluid.for_keys = for_keys
+fluid.forKeys = for_keys
 fluid.async = async
-fluid.for_values = for_values
+fluid.forValues = for_values
 fluid.read = read
 fluid.show = show
 fluid.switch = switch
-fluid.show_delay = show_delay
-fluid.switch_delay = switch_delay
+fluid.showDelay = show_delay
+fluid.switchDelay = switch_delay
 
 -- Animation
 fluid.spring = spring
 fluid.tween = tween
 
 -- Scheduling
-fluid.provide_scheduler = function(): (delta_time: number) -> ()
+fluid.provideScheduler = function(): (delta_time: number) -> ()
 	if scheduler_thread then
 		task.cancel(scheduler_thread)
 		scheduler_thread = nil
